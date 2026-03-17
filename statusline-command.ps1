@@ -81,6 +81,16 @@ if ($model_name) { $parts += "$purple$model_name$reset" }
 $parts += "$cyan$dir_name$reset"
 if ($git_info) { $parts += $git_info }
 if ($context_info) { $parts += $context_info }
+
+# Total session token usage
+$total_in = $input_data.context_window.total_input_tokens
+$total_out = $input_data.context_window.total_output_tokens
+if ($total_in -or $total_out) {
+    $in_k = [math]::Round($total_in / 1000)
+    $out_k = [math]::Round($total_out / 1000)
+    $parts += "${dim}in:${in_k}K out:${out_k}K$reset"
+}
+
 $parts += "$dim$time$reset"
 
 # Add vim mode indicator if enabled
