@@ -47,6 +47,7 @@
 - Keep commits focused — don't bundle unrelated changes together
 - Use conventional commits (`feat:`, `fix:`, `chore:` etc.) only if the project already does
 - No branding, attribution, or AI references in commit messages or PR descriptions — `Co-authored-by: Claude` and similar lines should never be added
+- Before staging or committing, check that no sensitive files are included — `.env`, `.env.local`, `.env.*`, credential files, private keys, or anything containing secrets. If in doubt, flag it rather than committing
 
 ---
 
