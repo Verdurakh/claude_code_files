@@ -1,30 +1,11 @@
 # Claude Code Windows Scripts
-PowerShell scripts for enhancing [Claude Code](https://docs.anthropic.com/en/docs/claude-code) on Windows.
 
-## Scripts
+A collection of scripts, configuration, and sane defaults for running [Claude Code](https://docs.anthropic.com/en/docs/claude-code) on Windows. Includes a notification script, a custom status line, a global `CLAUDE.md`, and a baseline `settings.json` with permission rules.
 
-### notify.ps1
-Sends a Windows toast notification when Claude Code finishes a response. Only triggers when the terminal is **not** in the foreground, so it won't interrupt you if you're already watching.
-
-### statusline-command.ps1
-A custom status line that displays:
-- **Model name** (purple)
-- **Current directory** (cyan)
-- **Git branch** with dirty/clean indicator (magenta + yellow/green)
-- **Context window usage** with color-coded percentage (green → yellow → orange → red)
-- **Current time**
-- **Vim mode** indicator (if enabled)
-
-## Global CLAUDE.md
-
-A global `CLAUDE.md` is included in this repo. It defines general coding preferences and behavior for Claude Code that apply across all projects — things like communication style, coding defaults, git conventions, and shell behavior.
-
-Copy it to your Claude config directory:
-```powershell
-Copy-Item CLAUDE.md "$env:USERPROFILE\.claude\CLAUDE.md"
-```
-
-This file is intentionally generic and not tied to any specific project or tech stack. For project-specific instructions, create a `CLAUDE.md` in the root of each project — Claude Code will pick that up automatically and layer it on top of the global one.
+## Requirements
+- Windows 10/11
+- PowerShell 5.1+
+- Git (for status line branch info)
 
 ## Installation
 
@@ -108,17 +89,37 @@ This file is intentionally generic and not tied to any specific project or tech 
    }
 ```
 
-## Permissions
+---
 
+## What's included
+
+### notify.ps1
+Sends a Windows toast notification when Claude Code finishes a response. Only triggers when the terminal is **not** in the foreground, so it won't interrupt you if you're already watching.
+
+### statusline-command.ps1
+A custom status line that displays:
+- **Model name** (purple)
+- **Current directory** (cyan)
+- **Git branch** with dirty/clean indicator (magenta + yellow/green)
+- **Context window usage** with color-coded percentage (green → yellow → orange → red)
+- **Current time**
+- **Vim mode** indicator (if enabled)
+
+### CLAUDE.md
+A global `CLAUDE.md` that defines general coding preferences and behavior for Claude Code across all your projects — things like communication style, coding defaults, git conventions, and shell behavior. Intentionally generic and not tied to any specific project or tech stack.
+
+For project-specific instructions, create a `CLAUDE.md` in the root of each project — Claude Code will pick it up automatically and layer it on top of the global one.
+
+### Permissions
 The `settings.json` above includes a baseline permissions configuration. Deny rules always take precedence over allow rules regardless of order, so the strategy is to allow broadly and deny the dangerous stuff explicitly. Adjust to fit your workflow.
 
-### Allow
+#### Allow
 
 | Rule | Reason |
 |------|--------|
 | `Read(**)` | Allows Claude to read any file in the working directory without prompting. Claude needs this constantly for context — restricting it just creates noise. |
 
-### Deny
+#### Deny
 
 | Rule | Reason |
 |------|--------|
@@ -144,8 +145,3 @@ The `settings.json` above includes a baseline permissions configuration. Deny ru
 | `Read(~/.npmrc)` `Read(~/.pypirc)` `Read(~/.gem/credentials)` | Package registry credentials for npm, PyPI, and RubyGems. |
 | `Read(**/.env)` `Read(**/.env.*)` | Env files anywhere in the project tree. These typically contain secrets, API keys, and database URLs. `.env.example` and `.env.sample` are intentionally not blocked since they contain no real secrets. |
 | `Edit(**/.env)` `Edit(**/.env.*)` | Same as above — prevents Claude from modifying env files even if it can't read them. |
-
-## Requirements
-- Windows 10/11
-- PowerShell 5.1+
-- Git (for status line branch info)
