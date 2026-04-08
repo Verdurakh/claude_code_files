@@ -105,6 +105,27 @@ A custom status line that displays:
 - **Current time**
 - **Vim mode** indicator (if enabled)
 
+### claude-start.bat
+Quickly open any local Git project in Claude Code without manually navigating folders.
+
+What it does:
+- Scans the directory where the script is located
+- Finds folders containing a `.git` repository (1–2 levels deep)
+- Displays them as a numbered list
+- Lets you pick a project
+- Starts `claude` in the selected folder
+
+Usage:
+- Place the script in a directory containing your projects
+- Run it (double-click or from terminal)
+- Select a project by number
+
+Notes:
+- Uses `%~dp0`, so it always runs relative to its own location
+- Requires `claude` to be available in PATH
+- Only detects Git repositories (`.git` folder required)
+- Scans up to 2 levels deep (intentional to keep it fast)
+
 ### CLAUDE.md
 A global `CLAUDE.md` that defines general coding preferences and behavior for Claude Code across all your projects — things like communication style, coding defaults, git conventions, and shell behavior. Intentionally generic and not tied to any specific project or tech stack.
 
