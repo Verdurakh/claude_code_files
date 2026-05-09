@@ -3,8 +3,8 @@ param(
     [int]$Days = 7,
     [string]$Project,
     [int]$TopSessions = 0,
-    # Pricing preset. "opus" = Claude Opus 4 standard (<=200K input). "sonnet" = Claude Sonnet 4 standard.
-    [ValidateSet('opus','sonnet')]
+    # Pricing preset. Defaults to current Opus rates (4.5+).
+    [ValidateSet('opus','opus-4-launch','sonnet')]
     [string]$Pricing = 'opus'
 )
 
@@ -16,8 +16,20 @@ $ErrorActionPreference = 'Stop'
 # estimate of your actual cost.
 $rates = switch ($Pricing) {
     'opus' {
+        # Current Opus rates (4.5 / 4.6 / 4.7), <=200K input.
         @{
-            Label        = 'Claude Opus 4 standard (<=200K input)'
+            Label        = 'Claude Opus 4.5+ standard (<=200K input)'
+            Input        = 5.00
+            Output       = 25.00
+            CacheWrite5m = 6.25
+            CacheWrite1h = 10.00
+            CacheRead    = 0.50
+        }
+    }
+    'opus-4-launch' {
+        # Original Opus 4.0 launch rates (3x higher than current Opus 4.5+).
+        @{
+            Label        = 'Claude Opus 4.0 launch (<=200K input)'
             Input        = 15.00
             Output       = 75.00
             CacheWrite5m = 18.75
