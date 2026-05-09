@@ -205,14 +205,14 @@ RAW TOKEN ACTIVITY
   Subagents              22,688,913   (8.5% of total)
   Cache hit                  96.1%   (read / (read+write); higher = better reuse)
 
-ESTIMATED API COST  (preset: Claude Opus 4 standard (<=200K input))
+ESTIMATED API COST  (preset: Claude Opus 4.5+ standard (<=200K input))
 ------------------------------------------------------------------------
-  input         @  $ 15.00/M       $        0.28
-  output        @  $ 75.00/M       $      117.06
-  cache write   @  $ 18.75/M (5m)  $      192.67   to  $      308.27 ($ 30.00/M @ 1h TTL)
-  cache read    @  $  1.50/M       $      380.41
+  input         @  $  5.00/M       $        0.09
+  output        @  $ 25.00/M       $       39.02
+  cache write   @  $  6.25/M (5m)  $       64.22   to  $      102.76 ($ 10.00/M @ 1h TTL)
+  cache read    @  $  0.50/M       $      126.80
   ----------------------------------------------------------------------
-  Estimated cost                    $      690.42   to  $      806.02
+  Estimated cost                    $      230.13   to  $      268.67
 
   (If you're on a Pro/Max subscription, this is informational only - not your bill.)
   (Range reflects unknown 5m vs 1h cache-write TTL. 1M-context tier > 200K input is priced higher.)
@@ -220,25 +220,25 @@ ESTIMATED API COST  (preset: Claude Opus 4 standard (<=200K input))
 BY PROJECT
 ------------------------------------------------------------------------
   Project                                      Tokens Est. $ (5m)  Sess  Sub%
-  my-app                                  212,185,909     $551.36     6  3.5%
-  web-tool                                 49,500,055     $128.45     3 30.7%
-  side-project                              3,776,700       $9.81     2    0%
+  my-app                                  212,185,909     $183.79     6  3.5%
+  web-tool                                 49,500,055      $42.82     3 30.7%
+  side-project                              3,776,700       $3.27     2    0%
 
 BY DAY
 ------------------------------------------------------------------------
-  2026-05-09        47,767,846      $124.18   (2 sessions)
-  2026-05-08         1,732,209        $4.51   (1 sessions)
+  2026-05-09        47,767,846       $41.39   (2 sessions)
+  2026-05-08         1,732,209        $1.50   (1 sessions)
   2026-05-07                 -            -   (0 sessions)
-  2026-05-06         3,776,700        $9.81   (2 sessions)
-  2026-05-05         4,139,121       $12.64   (1 sessions)
-  2026-05-04        26,513,640       $73.91   (2 sessions)
-  2026-05-03       181,533,148      $465.38   (3 sessions)
+  2026-05-06         3,776,700        $3.27   (2 sessions)
+  2026-05-05         4,139,121        $4.21   (1 sessions)
+  2026-05-04        26,513,640       $24.64   (2 sessions)
+  2026-05-03       181,533,148      $155.13   (3 sessions)
 ```
 
 **Things worth knowing:**
 
 - The Stop hook fires every time Claude stops responding within a session, not just at session end. The script handles that by upserting on `session_id` — each Stop overwrites that session's row with the latest cumulative totals. No double-counting.
-- The cost estimate uses Anthropic's published Opus 4 / Sonnet 4 standard rates. The 1M-context Opus tier costs more for input above 200K, so heavy-context users will see the real API equivalent be somewhat higher than what's reported.
+- The cost estimate defaults to current Opus 4.5+ standard rates. Use `-Pricing sonnet` for Sonnet rates or `-Pricing opus-4-launch` for the original (3× higher) Opus 4.0 launch prices. The 1M-context Opus tier costs more for input above 200K, so heavy-context users will see the real API equivalent be somewhat higher than what's reported.
 - The cache hit ratio is the metric to actually watch over time. A high ratio (>90%) means your prompt structure is stable and prompt caching is doing its job. A drop below ~80% suggests something is invalidating the cache often, which gets expensive fast.
 - The CSV is yours alone — don't commit it to a repo. It contains your project names and full session-by-session usage history.
 
