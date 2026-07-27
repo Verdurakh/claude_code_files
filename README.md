@@ -31,10 +31,16 @@ Everything under `claude/` mirrors the real `~/.claude` tree, and `sync.ps1` cop
 ```powershell
 git clone https://github.com/<you>/claude_code_files.git
 cd claude_code_files
-.\sync.ps1
+.\sync.cmd
 ```
 
 Then restart Claude Code so it picks up the new `settings.json`.
+
+`sync.cmd` is a thin wrapper that invokes `sync.ps1` with `-ExecutionPolicy Bypass`, so it works on a machine with the default Restricted policy and can also be double-clicked. To call the script directly instead:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\sync.ps1
+```
 
 `sync.ps1` copies `claude/scripts/*` into `~/.claude/scripts`, `claude/CLAUDE.md` into `~/.claude/CLAUDE.md`, and writes `~/.claude/settings.json`. The repo's `settings.json` stores hook and status line paths as a `{{CLAUDE_DIR}}` placeholder, which `sync.ps1` substitutes with the actual path on that machine — so the same committed file works under any user profile.
 
@@ -50,7 +56,7 @@ On any machine that already has this repo cloned:
 
 ```powershell
 git pull
-.\sync.ps1
+.\sync.cmd
 ```
 
 `sync.ps1` is re-runnable and safe to call repeatedly:
@@ -81,6 +87,7 @@ claude/
     token-dashboard-all.cmd
 claude-start.bat         (not part of ~/.claude — see below)
 sync.ps1
+sync.cmd                 (wrapper: runs sync.ps1 with -ExecutionPolicy Bypass)
 ```
 
 ---
