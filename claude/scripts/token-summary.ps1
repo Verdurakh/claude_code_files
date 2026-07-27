@@ -3,61 +3,20 @@ param(
     [int]$Days = 7,
     [string]$Project,
     [int]$TopSessions = 0,
-    # Pricing preset. Defaults to current Opus rates (4.5+).
+    # Fallback pricing preset for sessions with NO per-model data (pre-June
+    # sessions whose transcripts are gone). Defaults to Opus, the model used in
+    # ~90% of sessions. Sessions WITH model data are always priced per model.
     [ValidateSet('opus','opus-4-launch','sonnet')]
     [string]$Pricing = 'opus'
 )
 
 $ErrorActionPreference = 'Stop'
 
-# Anthropic API published rates ($ per 1M tokens). Used to estimate what usage
-# would cost on per-token API billing. If you're on a Pro/Max subscription this
-# is informational only; if you're billed per-token via the API it's a rough
-# estimate of your actual cost.
-$rates = switch ($Pricing) {
-    'opus' {
-        # Current Opus rates (4.5 / 4.6 / 4.7), <=200K input.
-        @{
-            Label        = 'Claude Opus 4.5+ standard (<=200K input)'
-            Input        = 5.00
-            Output       = 25.00
-            CacheWrite5m = 6.25
-            CacheWrite1h = 10.00
-            CacheRead    = 0.50
-        }
-    }
-    'opus-4-launch' {
-        # Original Opus 4.0 launch rates (3x higher than current Opus 4.5+).
-        @{
-            Label        = 'Claude Opus 4.0 launch (<=200K input)'
-            Input        = 15.00
-            Output       = 75.00
-            CacheWrite5m = 18.75
-            CacheWrite1h = 30.00
-            CacheRead    = 1.50
-        }
-    }
-    'sonnet' {
-        @{
-            Label        = 'Claude Sonnet 4 standard (<=200K input)'
-            Input        = 3.00
-            Output       = 15.00
-            CacheWrite5m = 3.75
-            CacheWrite1h = 6.00
-            CacheRead    = 0.30
-        }
-    }
-}
+. (Join-Path $PSScriptRoot 'token-usage-lib.ps1')
 
-function Get-Cost {
-    param($Row, $CacheWriteRate)
-    $c = 0.0
-    $c += [double]$Row.input          * $rates.Input        / 1e6
-    $c += [double]$Row.output         * $rates.Output       / 1e6
-    $c += [double]$Row.cache_creation * $CacheWriteRate     / 1e6
-    $c += [double]$Row.cache_read     * $rates.CacheRead    / 1e6
-    return $c
-}
+# Anthropic API published rates ($ per 1M tokens). If you're on a Pro/Max
+# subscription these are informational; if billed per-token they estimate cost.
+$rates = Get-PricingPreset $Pricing
 
 $logPath = Join-Path $HOME '.claude\token-usage.csv'
 if (-not (Test-Path -LiteralPath $logPath)) {
@@ -65,17 +24,8 @@ if (-not (Test-Path -LiteralPath $logPath)) {
     exit 0
 }
 
-$rows = Import-Csv -LiteralPath $logPath
+$rows = Import-TokenUsageRows $logPath
 if ($rows.Count -eq 0) { Write-Host 'Token log is empty.'; exit 0 }
-
-foreach ($r in $rows) {
-    $r.input          = [int64]$r.input
-    $r.output         = [int64]$r.output
-    $r.cache_read     = [int64]$r.cache_read
-    $r.cache_creation = [int64]$r.cache_creation
-    $r.subagent_total = [int64]$r.subagent_total
-    $r.total          = [int64]$r.total
-}
 
 $today    = (Get-Date).Date
 $cutoff   = $today.AddDays(-($Days - 1))
@@ -84,6 +34,10 @@ $filtered = $rows | Where-Object {
     $d -ge $cutoff -and $d -le $today
 }
 if ($Project) { $filtered = $filtered | Where-Object { $_.project -eq $Project } }
+
+# Per-model sidecar (token-usage-by-model.csv): session_id -> list of model rows.
+$modelLogPath = Join-Path $HOME '.claude\token-usage-by-model.csv'
+$sessionModelMap = Import-TokenUsageByModel $modelLogPath
 
 $rangeLabel = "$($cutoff.ToString('yyyy-MM-dd')) to $($today.ToString('yyyy-MM-dd'))"
 $projLabel  = if ($Project) { "  project=$Project" } else { '' }
@@ -115,27 +69,72 @@ Write-Host ("    cache write  {0,18:N0}   <- new cache entries" -f $cacheCreate)
 Write-Host ("  Subagents      {0,18:N0}   ({1}% of total)" -f $subTotal, $subPct)
 Write-Host ("  Cache hit      {0,17}%   (read / (read+write); higher = better reuse)" -f $cacheHitPct)
 
-# Cost breakdown - show as a range because cache writes can be 5m or 1h TTL
-$inCost      = $inTok       * $rates.Input        / 1e6
-$outCost     = $outTok      * $rates.Output       / 1e6
-$cwCost5m    = $cacheCreate * $rates.CacheWrite5m / 1e6
-$cwCost1h    = $cacheCreate * $rates.CacheWrite1h / 1e6
-$crCost      = $cacheRead   * $rates.CacheRead    / 1e6
-$totalLow    = $inCost + $outCost + $cwCost5m + $crCost
-$totalHigh   = $inCost + $outCost + $cwCost1h + $crCost
+# Model-aware cost: sum per-session parts (per-model where available).
+$inCost = 0.0; $outCost = 0.0; $cwCost5m = 0.0; $cwCost1h = 0.0; $crCost = 0.0
+$withModel = 0; $withoutModel = 0
+foreach ($row in $filtered) {
+    $p = Get-SessionCostParts $row $sessionModelMap $rates
+    $inCost   += $p.In
+    $outCost  += $p.Out
+    $cwCost5m += $p.Cw5m
+    $cwCost1h += $p.Cw1h
+    $crCost   += $p.Cr
+    if ($p.HasModel) { $withModel++ } else { $withoutModel++ }
+}
+$totalLow  = $inCost + $outCost + $cwCost5m + $crCost
+$totalHigh = $inCost + $outCost + $cwCost1h + $crCost
 
 Write-Host ''
-Write-Host "ESTIMATED API COST  (preset: $($rates.Label))"
+Write-Host "ESTIMATED API COST  (per-model where available; $($rates.Label) for the rest)"
 Write-Host ('-' * 72)
-Write-Host ("  input         @  `${0,6:N2}/M       `${1,12:N2}" -f $rates.Input, $inCost)
-Write-Host ("  output        @  `${0,6:N2}/M       `${1,12:N2}" -f $rates.Output, $outCost)
-Write-Host ("  cache write   @  `${0,6:N2}/M (5m)  `${1,12:N2}   to  `${2,12:N2} (`$ {3:N2}/M @ 1h TTL)" -f $rates.CacheWrite5m, $cwCost5m, $cwCost1h, $rates.CacheWrite1h)
-Write-Host ("  cache read    @  `${0,6:N2}/M       `${1,12:N2}" -f $rates.CacheRead, $crCost)
+Write-Host ("  input                          `${0,12:N2}" -f $inCost)
+Write-Host ("  output                         `${0,12:N2}" -f $outCost)
+Write-Host ("  cache write (5m TTL)           `${0,12:N2}   to  `${1,12:N2} (1h TTL)" -f $cwCost5m, $cwCost1h)
+Write-Host ("  cache read                     `${0,12:N2}" -f $crCost)
 Write-Host ('  ' + ('-' * 70))
-Write-Host ("  Estimated cost                    `${0,12:N2}   to  `${1,12:N2}" -f $totalLow, $totalHigh)
+Write-Host ("  Estimated cost                 `${0,12:N2}   to  `${1,12:N2}" -f $totalLow, $totalHigh)
 Write-Host ''
+Write-Host ("  Sessions priced per-model: {0} / {1}   (remaining {2} assumed {3})" -f $withModel, $sessions, $withoutModel, $Pricing)
 Write-Host "  (If you're on a Pro/Max subscription, this is informational only - not your bill.)"
 Write-Host "  (Range reflects unknown 5m vs 1h cache-write TTL. 1M-context tier > 200K input is priced higher.)"
+
+# BY MODEL - aggregate model rows across filtered sessions, plus a bucket for
+# filtered sessions with no model data (priced at the fallback preset).
+Write-Host ''
+Write-Host 'BY MODEL'
+Write-Host ('-' * 72)
+Write-Host ('  {0,-34} {1,15} {2,11} {3,5}' -f 'Model', 'Tokens', 'Est. $ (5m)', 'Sub%')
+
+$modelAgg = @{}
+function Add-ModelAgg($name, $tokens, $subTokens, $cost) {
+    if (-not $modelAgg.ContainsKey($name)) {
+        $modelAgg[$name] = [pscustomobject]@{ Tokens = 0L; Sub = 0L; Cost = 0.0 }
+    }
+    $modelAgg[$name].Tokens += [int64]$tokens
+    $modelAgg[$name].Sub    += [int64]$subTokens
+    $modelAgg[$name].Cost   += [double]$cost
+}
+
+foreach ($row in $filtered) {
+    if ($sessionModelMap.ContainsKey($row.session_id)) {
+        foreach ($mr in $sessionModelMap[$row.session_id]) {
+            $rt   = Get-ModelRates $mr.model
+            $cost = ($mr.input * $rt.Input + $mr.output * $rt.Output + $mr.cache_creation * $rt.CacheWrite5m + $mr.cache_read * $rt.CacheRead) / 1e6
+            $sub  = if ($mr.scope -eq 'subagent') { $mr.total } else { 0 }
+            Add-ModelAgg $mr.model $mr.total $sub $cost
+        }
+    } else {
+        $cost = Get-SessionCost5m $row $sessionModelMap $rates
+        Add-ModelAgg "(no model data - $Pricing)" $row.total $row.subagent_total $cost
+    }
+}
+
+$modelAgg.GetEnumerator() |
+    Sort-Object { $_.Value.Tokens } -Descending |
+    ForEach-Object {
+        $sp = if ($_.Value.Tokens -gt 0) { [math]::Round(100 * $_.Value.Sub / $_.Value.Tokens, 1) } else { 0 }
+        Write-Host ('  {0,-34} {1,15:N0} {2,11} {3,4}%' -f $_.Key, $_.Value.Tokens, ('${0:N2}' -f $_.Value.Cost), $sp)
+    }
 
 if (-not $Project) {
     Write-Host ''
@@ -151,7 +150,7 @@ if (-not $Project) {
             $s    = ($g | Measure-Object subagent_total -Sum).Sum
             $sp   = if ($t -gt 0) { [math]::Round(100 * $s / $t, 1) } else { 0 }
             $sess = @($g).Count
-            $cost = ($g | ForEach-Object { Get-Cost -Row $_ -CacheWriteRate $rates.CacheWrite5m } | Measure-Object -Sum).Sum
+            $cost = ($g | ForEach-Object { Get-SessionCost5m $_ $sessionModelMap $rates } | Measure-Object -Sum).Sum
             Write-Host ('  {0,-40} {1,15:N0} {2,11} {3,5} {4,4}%' -f $_.Name, $t, ('${0:N2}' -f $cost), $sess, $sp)
         }
 }
@@ -164,7 +163,7 @@ $filtered | Group-Object date | ForEach-Object {
     $byDay[$_.Name] = [pscustomobject]@{
         Sessions = @($_.Group).Count
         Total    = ($_.Group | Measure-Object total -Sum).Sum
-        Cost     = ($_.Group | ForEach-Object { Get-Cost -Row $_ -CacheWriteRate $rates.CacheWrite5m } | Measure-Object -Sum).Sum
+        Cost     = ($_.Group | ForEach-Object { Get-SessionCost5m $_ $sessionModelMap $rates } | Measure-Object -Sum).Sum
     }
 }
 for ($i = 0; $i -lt $Days; $i++) {
@@ -185,7 +184,7 @@ if ($TopSessions -gt 0) {
         Select-Object -First $TopSessions |
         ForEach-Object {
             $sp   = if ($_.total -gt 0) { [math]::Round(100 * $_.subagent_total / $_.total, 1) } else { 0 }
-            $cost = Get-Cost -Row $_ -CacheWriteRate $rates.CacheWrite5m
+            $cost = Get-SessionCost5m $_ $sessionModelMap $rates
             Write-Host ('  {0}  {1,-40} {2,15:N0}  {3,9}  (sub={4}%)' -f $_.date, $_.project, $_.total, ('${0:N2}' -f $cost), $sp)
         }
 }
