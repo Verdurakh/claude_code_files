@@ -25,6 +25,14 @@
 - If completing a task would require changing something outside the stated scope, flag it rather than just doing it
 - Don't create documentation, summary, or scratch files (SUMMARY.md, NOTES.md, etc.) unless explicitly asked
 
+## Subagents
+- **Standing authorization to use the Agent tool** for exploration, broad codebase searches, and independent reads that can run in parallel — whenever that's genuinely cheaper than doing it inline. Treat this as a request already made; don't ask each time
+- Prefer the read-only `Explore` agent for search sweeps
+- Keep it proportionate — a couple of agents, not a fleet. Ask first when subagents would write or edit files, when more than ~3 would run at once, or when it's unclear the fan-out earns its cost
+- Summarize what they found; don't dump their raw output
+- Delegated exploration still has to stay on the asked task — a subagent is not licence to go wandering
+- This does **not** extend to the Workflow tool, multi-agent orchestration, or deep research. Those stay opt-in per request
+
 ## Shell & terminal
 - Never prefix commands with `cd` when already in the working directory — run commands directly (`git commit` not `cd /path/to/project && git commit`)
 - Never use HEREDOC in commands — use simple inline arguments instead
