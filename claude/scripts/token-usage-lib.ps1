@@ -48,25 +48,46 @@ function Get-PricingPreset([string]$Pricing) {
     }
 }
 
-# Per-model rates by family. Cache-write 5m = 1.25x input, 1h = 2x input,
-# cache-read = 0.1x input. Families collapse to a single rate because every
-# version within a family is priced identically (opus-4-7 == opus-4-8, etc.).
-# Unknown / missing model strings fall back to Opus.
+# Per-model-version rates in $/MTok, from https://platform.claude.com/docs/en/about-claude/pricing
+# (checked 2026-09-23). Prices differ between versions of the same family, so
+# this table has to be updated by hand whenever Anthropic changes them.
+# Cache-write 5m = 1.25x input and 1h = 2x input everywhere; cache-read is
+# 0.1x input except on fable/mythos 5.1 and opus 5.5, which are cheaper.
+# Within a family, rules are ordered newest first and the first rule whose
+# MinVersion is <= the model's version wins.
+$script:ModelRateRules = @(
+    @{ Family = 'fable';  MinVersion = [version]'5.1'; Rates = @{ Input = 10.00; Output = 50.00; CacheWrite5m = 12.50; CacheWrite1h = 20.00; CacheRead = 0.25 } }
+    @{ Family = 'fable';  MinVersion = [version]'0.0'; Rates = @{ Input = 10.00; Output = 50.00; CacheWrite5m = 12.50; CacheWrite1h = 20.00; CacheRead = 1.00 } }
+    @{ Family = 'mythos'; MinVersion = [version]'5.1'; Rates = @{ Input = 10.00; Output = 50.00; CacheWrite5m = 12.50; CacheWrite1h = 20.00; CacheRead = 0.25 } }
+    @{ Family = 'mythos'; MinVersion = [version]'0.0'; Rates = @{ Input = 10.00; Output = 50.00; CacheWrite5m = 12.50; CacheWrite1h = 20.00; CacheRead = 1.00 } }
+    @{ Family = 'opus';   MinVersion = [version]'5.5'; Rates = @{ Input =  4.00; Output = 20.00; CacheWrite5m =  5.00; CacheWrite1h =  8.00; CacheRead = 0.20 } }
+    @{ Family = 'opus';   MinVersion = [version]'4.5'; Rates = @{ Input =  5.00; Output = 25.00; CacheWrite5m =  6.25; CacheWrite1h = 10.00; CacheRead = 0.50 } }
+    @{ Family = 'opus';   MinVersion = [version]'0.0'; Rates = @{ Input = 15.00; Output = 75.00; CacheWrite5m = 18.75; CacheWrite1h = 30.00; CacheRead = 1.50 } }
+    @{ Family = 'sonnet'; MinVersion = [version]'5.0'; Rates = @{ Input =  2.00; Output = 10.00; CacheWrite5m =  2.50; CacheWrite1h =  4.00; CacheRead = 0.20 } }
+    @{ Family = 'sonnet'; MinVersion = [version]'0.0'; Rates = @{ Input =  3.00; Output = 15.00; CacheWrite5m =  3.75; CacheWrite1h =  6.00; CacheRead = 0.30 } }
+    @{ Family = 'haiku';  MinVersion = [version]'0.0'; Rates = @{ Input =  1.00; Output =  5.00; CacheWrite5m =  1.25; CacheWrite1h =  2.00; CacheRead = 0.10 } }
+)
+
+# Unknown / missing model strings fall back to the Opus 4.5+ rate.
 function Get-ModelRates([string]$model) {
     $m = if ($model) { $model.ToLower() } else { '' }
     if ($m -eq '<synthetic>' -or $m -eq 'synthetic') {
         return @{ Input = 0; Output = 0; CacheWrite5m = 0; CacheWrite1h = 0; CacheRead = 0 }
     }
-    if ($m -like '*fable*' -or $m -like '*mythos*') {
-        return @{ Input = 10.00; Output = 50.00; CacheWrite5m = 12.50; CacheWrite1h = 20.00; CacheRead = 1.00 }
+    $families = 'fable|mythos|opus|sonnet|haiku'
+    # Versions are capped at two digits so a trailing date (claude-sonnet-4-20250514,
+    # claude-3-7-sonnet-20250219) is never read as one. The second pattern is the
+    # older claude-3-5-haiku naming.
+    if ($m -match "(?<family>$families)-(?<major>\d{1,2})(?:-(?<minor>\d{1,2}))?(?!\d)" -or
+        $m -match "claude-(?<major>\d{1,2})(?:-(?<minor>\d{1,2}))?-(?<family>$families)") {
+        $minor = if ($Matches['minor']) { $Matches['minor'] } else { '0' }
+        $version = [version]"$($Matches['major']).$minor"
+        foreach ($rule in $script:ModelRateRules) {
+            if ($rule.Family -eq $Matches['family'] -and $version -ge $rule.MinVersion) {
+                return $rule.Rates.Clone()
+            }
+        }
     }
-    if ($m -like '*haiku*') {
-        return @{ Input = 1.00; Output = 5.00; CacheWrite5m = 1.25; CacheWrite1h = 2.00; CacheRead = 0.10 }
-    }
-    if ($m -like '*sonnet*') {
-        return @{ Input = 3.00; Output = 15.00; CacheWrite5m = 3.75; CacheWrite1h = 6.00; CacheRead = 0.30 }
-    }
-    # opus and everything unrecognized -> Opus rates
     return @{ Input = 5.00; Output = 25.00; CacheWrite5m = 6.25; CacheWrite1h = 10.00; CacheRead = 0.50 }
 }
 

@@ -282,6 +282,7 @@ BY DAY
 
 - The Stop hook fires every time Claude stops responding within a session, not just at session end. The script handles that by upserting on `session_id` — each Stop overwrites that session's row with the latest cumulative totals. No double-counting.
 - Sessions logged since the per-model sidecar existed are priced with each model's own rates. Older rows have no model data and fall back to the `-Pricing` preset (default Opus); the report tells you how many rows fell back.
+- Rates are looked up per model version, not per family — Opus 5.5 is cheaper than Opus 5, which is cheaper than Opus 4.1. The rate table lives in `token-usage-lib.ps1` and has to be updated by hand when Anthropic changes prices. After editing it, run `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\token-usage-lib.tests.ps1`, which checks the lookup against every priced model string and exits non-zero on any mismatch.
 - The 1M-context Opus tier costs more for input above 200K, which isn't modelled — heavy-context users will see the real API equivalent be somewhat higher than what's reported.
 - The cache hit ratio is the metric to actually watch over time. A high ratio (>90%) means your prompt structure is stable and prompt caching is doing its job. A drop below ~80% suggests something is invalidating the cache often, which gets expensive fast.
 - The CSVs are yours alone — don't commit them to a repo. They contain your project names and full session-by-session usage history.
