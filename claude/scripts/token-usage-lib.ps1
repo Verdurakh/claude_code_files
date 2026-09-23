@@ -1,6 +1,13 @@
 # Shared library for Claude Code token usage reporting.
-# Dot-sourced by token-summary.ps1 and token-dashboard.ps1 so pricing tables
-# and CSV parsing live in exactly one place.
+# Dot-sourced by the token scripts so the config dir, pricing tables and CSV
+# parsing live in exactly one place.
+
+# Same resolution Claude Code uses, so a CLAUDE_CONFIG_DIR install reads and
+# writes its own tree instead of ~/.claude.
+function Get-ClaudeConfigDir {
+    if (-not [string]::IsNullOrWhiteSpace($env:CLAUDE_CONFIG_DIR)) { return $env:CLAUDE_CONFIG_DIR }
+    return (Join-Path $HOME '.claude')
+}
 
 # Fallback pricing preset for sessions with NO per-model data (pre-June
 # sessions whose transcripts are gone). Sessions WITH model data are always

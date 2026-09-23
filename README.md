@@ -53,7 +53,7 @@ If Claude Code runs against something other than `~/.claude` — via `CLAUDE_CON
 .\sync.cmd -ClaudeDir "$env:USERPROFILE\.claude-work"
 ```
 
-The `{{CLAUDE_DIR}}` substitution follows the target, so the hook and status line paths point at the directory you actually installed into.
+The `{{CLAUDE_DIR}}` substitution follows the target, so the hook and status line paths point at the directory you actually installed into. The token scripts find that directory through `CLAUDE_CONFIG_DIR`, so set it in any shell where you run `tokens.cmd` or the backfill as well.
 
 Optionally seed historical token data (see [Token usage tracking](#token-usage-tracking)):
 
@@ -187,7 +187,7 @@ A set of scripts that record per-session token usage and let you see where your 
 
 - **`log-token-usage.ps1`** — runs as a `Stop` hook. On every Stop event Claude Code passes it the session's `transcript_path` on stdin. The script reads the transcript JSONL, sums `input` / `output` / `cache_read` / `cache_creation` token counts across all assistant messages, also sums any subagent transcripts under `<session>/subagents/agent-*.jsonl`, and upserts a row keyed by `session_id` into `~/.claude/token-usage.csv`. It also writes a per-model sidecar to `~/.claude/token-usage-by-model.csv`, one row per (session, scope, model), so costs can be attributed to the model that actually ran. Concurrency-safe via named global mutexes so two sessions stopping at once don't corrupt either file. Runs `async: true` so it never blocks the UI.
 - **`backfill-token-usage.ps1`** — one-shot history seeder. Walks every parent transcript under `~/.claude/projects/**/*.jsonl`, applies the same summing logic, and adds rows for any session not already in the CSV. Re-runnable; never duplicates. Note that Claude Code only retains transcripts for `cleanupPeriodDays` (default 30), so you'll only get the last ~month of history.
-- **`token-usage-lib.ps1`** — shared library dot-sourced by the reporting scripts. Holds the pricing presets, per-model rate lookup, CSV loaders, and the cost math. Not run directly.
+- **`token-usage-lib.ps1`** — shared library dot-sourced by the other token scripts. Holds the config directory lookup, pricing presets, per-model rate lookup, CSV loaders, and the cost math. Not run directly.
 - **`token-summary.ps1`** — pretty-printed terminal report over a sliding window. Raw token activity, estimated API cost, per-model / per-project / per-day breakdowns. Cache writes are shown as a 5m–1h TTL cost range (since the CSV doesn't break those out separately).
 - **`token-dashboard.ps1`** — generates a standalone HTML dashboard at `~/.claude/token-dashboard.html` and opens it. Same data as the summary, but charted. Takes the same parameters, plus `-Days 0` for all-time.
 - **`.cmd` wrappers** — `tokens.cmd` (summary), `token-dashboard.cmd`, and the `-14` / `-30` / `-all` dashboard presets. Add `~/.claude/scripts` to your PATH if you want to type just `tokens` from anywhere.
@@ -207,6 +207,8 @@ date, project, session_id, scope, model, input, output, cache_read, cache_creati
 ```
 
 `project` is the leaf directory of the session's `cwd` (e.g. `my-app` from `C:\Users\you\code\my-app`). `subagent_total` is how much of `total` came from subagent transcripts. `scope` distinguishes main-session rows from subagent rows.
+
+All of these paths are relative to `CLAUDE_CONFIG_DIR` when it is set, falling back to `~/.claude` — the same rule Claude Code uses. If you installed with `sync.cmd -ClaudeDir ...`, set `CLAUDE_CONFIG_DIR` in any shell where you run `tokens.cmd` too, or the reports will look for the CSVs in `~/.claude` and find nothing.
 
 **Usage:**
 

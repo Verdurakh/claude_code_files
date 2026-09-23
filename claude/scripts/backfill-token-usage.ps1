@@ -1,6 +1,8 @@
 param()
 $ErrorActionPreference = 'Stop'
 
+. (Join-Path $PSScriptRoot 'token-usage-lib.ps1')
+
 function Sum-UsageFromTranscript([string]$path) {
     $sum = [pscustomobject]@{ Input = 0L; Output = 0L; CacheRead = 0L; CacheCreate = 0L }
     if (-not (Test-Path -LiteralPath $path)) { return $sum }
@@ -56,13 +58,14 @@ function Get-CwdFromTranscript([string]$path) {
     return $null
 }
 
-$root = Join-Path $HOME '.claude\projects'
+$claudeDir = Get-ClaudeConfigDir
+$root = Join-Path $claudeDir 'projects'
 if (-not (Test-Path -LiteralPath $root)) { Write-Host 'No projects directory.'; exit 0 }
 
-$logPath = Join-Path $HOME '.claude\token-usage.csv'
+$logPath = Join-Path $claudeDir 'token-usage.csv'
 $header  = 'date,project,session_id,input,output,cache_read,cache_creation,subagent_total,total'
 
-$modelPath   = Join-Path $HOME '.claude\token-usage-by-model.csv'
+$modelPath   = Join-Path $claudeDir 'token-usage-by-model.csv'
 $modelHeader = 'date,project,session_id,scope,model,input,output,cache_read,cache_creation,total'
 
 # Build map of existing session_id -> row so we don't duplicate. The live hook's

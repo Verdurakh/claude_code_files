@@ -45,6 +45,8 @@ function Get-UsageByModel([string]$path) {
 }
 
 try {
+    . (Join-Path $PSScriptRoot 'token-usage-lib.ps1')
+
     $stdin = [Console]::In.ReadToEnd()
     if ([string]::IsNullOrWhiteSpace($stdin)) { exit 0 }
     $payload = $stdin | ConvertFrom-Json
@@ -79,7 +81,8 @@ try {
     $subTotal    = $subSum.Input + $subSum.Output + $subSum.CacheRead + $subSum.CacheCreate
     $total       = $inTok + $outTok + $cacheRead + $cacheCreate
 
-    $logPath = Join-Path $HOME '.claude\token-usage.csv'
+    $claudeDir = Get-ClaudeConfigDir
+    $logPath = Join-Path $claudeDir 'token-usage.csv'
     $date    = (Get-Date).ToString('yyyy-MM-dd')
     $header  = 'date,project,session_id,input,output,cache_read,cache_creation,subagent_total,total'
     $newRow  = "$date,$project,$sessionId,$inTok,$outTok,$cacheRead,$cacheCreate,$subTotal,$total"
@@ -128,7 +131,7 @@ try {
         }
     }
 
-    $modelPath   = Join-Path $HOME '.claude\token-usage-by-model.csv'
+    $modelPath   = Join-Path $claudeDir 'token-usage-by-model.csv'
     $modelHeader = 'date,project,session_id,scope,model,input,output,cache_read,cache_creation,total'
     $modelNewRows = @()
     foreach ($scope in @('main', 'subagent')) {

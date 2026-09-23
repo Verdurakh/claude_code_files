@@ -18,7 +18,7 @@ $ErrorActionPreference = 'Stop'
 # subscription these are informational; if billed per-token they estimate cost.
 $rates = Get-PricingPreset $Pricing
 
-$logPath = Join-Path $HOME '.claude\token-usage.csv'
+$logPath = Join-Path (Get-ClaudeConfigDir) 'token-usage.csv'
 if (-not (Test-Path -LiteralPath $logPath)) {
     Write-Host "No token log found at $logPath. Run a session (or backfill-token-usage.ps1) first."
     exit 0
@@ -36,7 +36,7 @@ $filtered = $rows | Where-Object {
 if ($Project) { $filtered = $filtered | Where-Object { $_.project -eq $Project } }
 
 # Per-model sidecar (token-usage-by-model.csv): session_id -> list of model rows.
-$modelLogPath = Join-Path $HOME '.claude\token-usage-by-model.csv'
+$modelLogPath = Join-Path (Get-ClaudeConfigDir) 'token-usage-by-model.csv'
 $sessionModelMap = Import-TokenUsageByModel $modelLogPath
 
 $rangeLabel = "$($cutoff.ToString('yyyy-MM-dd')) to $($today.ToString('yyyy-MM-dd'))"

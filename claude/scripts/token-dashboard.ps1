@@ -14,9 +14,10 @@ $ErrorActionPreference = 'Stop'
 
 $rates = Get-PricingPreset $Pricing
 
-$logPath      = Join-Path $HOME '.claude\token-usage.csv'
-$modelLogPath = Join-Path $HOME '.claude\token-usage-by-model.csv'
-$outPath      = Join-Path $HOME '.claude\token-dashboard.html'
+$claudeDir    = Get-ClaudeConfigDir
+$logPath      = Join-Path $claudeDir 'token-usage.csv'
+$modelLogPath = Join-Path $claudeDir 'token-usage-by-model.csv'
+$outPath      = Join-Path $claudeDir 'token-dashboard.html'
 
 $rows = Import-TokenUsageRows $logPath
 
