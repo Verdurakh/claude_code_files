@@ -92,6 +92,12 @@ if ($total_in -or $total_out) {
     $parts += "${dim}in:${in_k}K out:${out_k}K$reset"
 }
 
+# Session cost estimate (same figure /usage shows)
+$total_cost = $input_data.cost.total_cost_usd
+if ($null -ne $total_cost) {
+    $parts += "$dim`$$(([double]$total_cost).ToString('0.00', [cultureinfo]::InvariantCulture))$reset"
+}
+
 $parts += "$dim$time$reset"
 
 # Add vim mode indicator if enabled

@@ -12,7 +12,7 @@ Everything under `claude/` mirrors the real `~/.claude` tree, and `sync.ps1` cop
 - [Repo layout](#repo-layout)
 - [What's included](#whats-included)
   - [notify.ps1](#notifyps1) — Windows toast notification when Claude Code finishes a response
-  - [statusline-command.ps1](#statusline-commandps1) — custom status line with model, branch, context %, time
+  - [statusline-command.ps1](#statusline-commandps1) — custom status line with model, branch, context %, session cost, time
   - [block-cd.ps1](#block-cdps1) — guard hook that rejects `cd ... &&` command prefixes
   - [block-machine-reach.ps1](#block-machine-reachps1) — guard hook that blocks launching programs, installing things, and `az` writes
   - [claude-start.bat](#claude-startbat) — pick a Git project from a numbered list and launch `claude` in it
@@ -118,6 +118,8 @@ A custom status line that displays:
 - **Current directory** (cyan)
 - **Git branch** with dirty/clean indicator (magenta + yellow/green)
 - **Context window usage** with color-coded percentage (green → yellow → orange → red)
+- **Session token totals** (input/output)
+- **Session cost estimate** in USD — the same figure `/usage` reports, priced at API list rates
 - **Current time**
 - **Vim mode** indicator (if enabled)
 
