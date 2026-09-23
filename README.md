@@ -1,6 +1,6 @@
 # Claude Code Windows Scripts
 
-A collection of scripts, configuration, and sane defaults for running [Claude Code](https://docs.anthropic.com/en/docs/claude-code) on Windows. Includes a notification script, a custom status line, a `cd`-blocking guard hook, a global `CLAUDE.md`, a `settings.json` with permission rules, and per-session token usage tracking with both a terminal report and an HTML dashboard.
+A collection of scripts, configuration, and sane defaults for running [Claude Code](https://docs.anthropic.com/en/docs/claude-code) on Windows. Includes a notification script, a custom status line, two guard hooks, a global `CLAUDE.md`, a `settings.json` with permission rules, and per-session token usage tracking with both a terminal report and an HTML dashboard.
 
 Everything under `claude/` mirrors the real `~/.claude` tree, and `sync.ps1` copies it into place. Cloning this repo onto a new machine and running one command gets you the same setup.
 
@@ -14,6 +14,7 @@ Everything under `claude/` mirrors the real `~/.claude` tree, and `sync.ps1` cop
   - [notify.ps1](#notifyps1) — Windows toast notification when Claude Code finishes a response
   - [statusline-command.ps1](#statusline-commandps1) — custom status line with model, branch, context %, time
   - [block-cd.ps1](#block-cdps1) — guard hook that rejects `cd ... &&` command prefixes
+  - [block-machine-reach.ps1](#block-machine-reachps1) — guard hook that blocks launching programs, installing things, and `az` writes
   - [claude-start.bat](#claude-startbat) — pick a Git project from a numbered list and launch `claude` in it
   - [CLAUDE.md](#claudemd) — global coding preferences and conventions
   - [Token usage tracking](#token-usage-tracking) — per-session token log, terminal report, HTML dashboard
@@ -43,6 +44,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\sync.ps1
 ```
 
 `sync.ps1` copies `claude/scripts/*` into `~/.claude/scripts`, `claude/CLAUDE.md` into `~/.claude/CLAUDE.md`, and writes `~/.claude/settings.json`. The repo's `settings.json` stores hook and status line paths as a `{{CLAUDE_DIR}}` placeholder, which `sync.ps1` substitutes with the actual path on that machine — so the same committed file works under any user profile.
+
+### A different configuration directory
+
+If Claude Code runs against something other than `~/.claude` — via `CLAUDE_CONFIG_DIR`, or a per-client profile directory — pass it to the sync, or you will install a tree that nothing reads and see every step report success:
+
+```powershell
+.\sync.cmd -ClaudeDir "$env:USERPROFILE\.claude-work"
+```
+
+The `{{CLAUDE_DIR}}` substitution follows the target, so the hook and status line paths point at the directory you actually installed into.
 
 Optionally seed historical token data (see [Token usage tracking](#token-usage-tracking)):
 
@@ -75,6 +86,7 @@ claude/
     notify.ps1
     statusline-command.ps1
     block-cd.ps1
+    block-machine-reach.ps1
     log-token-usage.ps1
     backfill-token-usage.ps1
     token-usage-lib.ps1
@@ -114,6 +126,30 @@ A custom status line that displays:
 A `PreToolUse` hook on the `Bash` tool. Reads the proposed command from stdin and exits with code 2 — rejecting the call with an explanation — if it starts with a `cd <path> &&` or `cd <path>;` prefix.
 
 Claude has a habit of prefixing every shell command with a `cd` into the working directory it's already in. That's noise, and worse, it defeats permission-rule matching: an allow rule for `Bash(git status:*)` doesn't match `cd /some/path && git status`, so you get prompted for commands you already approved. The `CLAUDE.md` rule alone gets ignored often enough that a hard block is worth it.
+
+### block-machine-reach.ps1
+
+A second `PreToolUse` hook on the `Bash` tool, alongside `block-cd.ps1`. It exits with code 2 — rejecting the call and telling Claude to ask instead — for commands that reach into the machine or into Azure rather than into the repository:
+
+| Rule | Blocks |
+|------|--------|
+| Executables | Any `.exe`, wherever it appears in the command, unless its bare file name is in the `$allowedExecutables` whitelist at the top of the script. That list ships **empty**. |
+| Launches and installs | `start`, `Start-Process`, `Start-Service`, `Stop-Service`, `explorer`, `net`/`sc start\|stop\|config`, `systemctl`, `open -a`, `schtasks`, `winget`/`choco`/`scoop install`, `npm i -g`, `docker desktop`. |
+| Azure CLI | `az` fails closed: allowed only when it matches a read shape (`list`, `show`, `exists`, `get-access-token`, `--version`, `--help`, …), and the verb must appear **before the first flag**, so `az ... update --query list` is not mistaken for a read. |
+
+The motivating incident: Claude wanted to run the contract tests, found the Docker daemon down, noted that the project README lists Docker as a prerequisite, and started Docker Desktop. The reasoning was sound and the conclusion was not — a documented prerequisite says what the task needs, not that you may change the state of someone's computer. The matching `CLAUDE.md` section is "My machine is mine"; this hook is what makes it stick.
+
+The `.exe` rule is deliberately blunt, because nothing in ordinary work needs one. `MSBuild` is passed to Stryker as `MSBuild.dll`, and `curl.exe` only ever appears *inside* `.ps1` scripts, which the hook never sees — it only sees the command Claude issues. Add to the whitelist when a block proves a real need; the block message names what tripped it.
+
+No hook is airtight — a script written to disk and then invoked would slip past. This makes the easy path safe; the `CLAUDE.md` rule covers the rest.
+
+`tests\block-machine-reach.tests.ps1` runs the guard against 22 commands and exits non-zero on any surprise. Run it after editing the patterns:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\block-machine-reach.tests.ps1
+```
+
+Half the cases are commands that must **not** be blocked, and they earn their place: the first version of this hook rejected `git commit -m "...blocks installs and az writes"`, because `az` appeared inside the message. A guard that fires on innocent commands is one people learn to route around, so the patterns that collide with ordinary English — `start`, `net`, `sc`, `az`, `open` — only match at the head of a command or straight after a `;`, `&&`, `|` or `(`.
 
 ### claude-start.bat
 
@@ -252,7 +288,7 @@ The committed `claude/settings.json` covers:
 | Setting | What it does |
 |---------|--------------|
 | `hooks.Stop` | Runs `notify.ps1` and `log-token-usage.ps1`, both `async` so neither blocks the UI. |
-| `hooks.PreToolUse` | Runs `block-cd.ps1` on the `Bash` tool. |
+| `hooks.PreToolUse` | Runs `block-cd.ps1` and `block-machine-reach.ps1` on the `Bash` tool, in that order. |
 | `statusLine` | Runs `statusline-command.ps1`. |
 | `model` | Default model (`opus[1m]` — Opus with the 1M context window). |
 | `effortLevel` | Default reasoning effort (`high`). |

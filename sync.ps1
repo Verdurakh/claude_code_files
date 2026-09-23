@@ -8,20 +8,30 @@
     the scripts and backs up CLAUDE.md / settings.json before replacing them.
 
     settings.json is stored in the repo with a {{CLAUDE_DIR}} placeholder, which
-    is substituted with this machine's actual .claude path on write.
+    is substituted with the target directory's actual path on write.
+
+.PARAMETER ClaudeDir
+    The configuration directory to install into. Defaults to ~/.claude. Pass this
+    when Claude Code runs against a different directory via CLAUDE_CONFIG_DIR —
+    syncing into ~/.claude while the CLI reads another directory writes a tree
+    nothing loads, and looks like it worked.
 
 .EXAMPLE
     .\sync.ps1
+
+.EXAMPLE
+    .\sync.ps1 -ClaudeDir "$env:USERPROFILE\.claude-work"
 #>
 
 [CmdletBinding()]
-param()
+param(
+    [string]$ClaudeDir = (Join-Path $env:USERPROFILE '.claude')
+)
 
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot   = $PSScriptRoot
 $SourceRoot = Join-Path $RepoRoot 'claude'
-$ClaudeDir  = Join-Path $env:USERPROFILE '.claude'
 $ScriptsDir = Join-Path $ClaudeDir 'scripts'
 $Stamp      = Get-Date -Format 'yyyyMMdd-HHmmss'
 

@@ -105,6 +105,10 @@
           {
             "type": "command",
             "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"{{CLAUDE_DIR}}\\scripts\\block-cd.ps1\""
+          },
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"{{CLAUDE_DIR}}\\scripts\\block-machine-reach.ps1\""
           }
         ]
       }

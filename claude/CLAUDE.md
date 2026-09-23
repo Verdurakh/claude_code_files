@@ -33,6 +33,24 @@
 - Delegated exploration still has to stay on the asked task — a subagent is not licence to go wandering
 - This does **not** extend to the Workflow tool, multi-agent orchestration, or deep research. Those stay opt-in per request
 
+## My machine is mine
+- **Never start, stop, install or uninstall anything on this machine.** No applications, no GUI
+  apps, no services, no daemons, no containers, no package installs. This holds even when a
+  README, a test harness or an error message names the thing as a required prerequisite. A
+  documented prerequisite tells you what the task needs; it is not permission to change the state
+  of my computer
+- **Never reach outside the working directory to make something work.** Reading a file I pointed
+  you at is fine; changing machine state, system configuration, installed tooling or anything under
+  my user profile that the task did not explicitly name is not
+- When something is blocked because a program is not running or a tool is missing: **say so, name
+  the one command I would run, and stop.** Finish everything that is not blocked, and report the
+  blocked part as explicitly unverified. Do not clear the obstacle yourself
+- Ease is not permission. "I could do this in one command" is the reason to hand it to me, not the
+  reason to do it. Anything I could trivially do myself, and that touches my machine rather than
+  the repository, is mine to do
+- If you think an exception is genuinely warranted, ask in one sentence and wait. A yes covers that
+  one action, not the category
+
 ## Shell & terminal
 - Never prefix commands with `cd` when already in the working directory — run commands directly (`git commit` not `cd /path/to/project && git commit`)
 - Never use HEREDOC in commands — use simple inline arguments instead
