@@ -300,7 +300,7 @@ The committed `claude/settings.json` covers:
 | `effortLevel` | Default reasoning effort (`high`). |
 | `alwaysThinkingEnabled` | Extended thinking on by default. |
 | `tui` | `fullscreen` terminal UI. |
-| `enabledPlugins` / `extraKnownMarketplaces` | Plugins to enable on a fresh machine, including the Firebase marketplace. |
+| `enabledPlugins` | Plugins from the official marketplace to enable on a fresh machine. Opinionated — trim to taste. Note that `sync.ps1` replaces `settings.json` wholesale, so plugins enabled locally but not listed here are disabled after a sync. |
 | `permissions` | The allow/deny rules below. |
 
 The four script paths are stored as `{{CLAUDE_DIR}}\scripts\...` and rewritten by `sync.ps1`. If you edit `settings.json` by hand, edit it here in the repo and re-run `sync.ps1` — don't edit `~/.claude/settings.json` directly, or the next sync will back it up and overwrite it.

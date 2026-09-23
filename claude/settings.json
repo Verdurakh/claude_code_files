@@ -127,16 +127,7 @@
     "typescript-lsp@claude-plugins-official": true,
     "superpowers@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true,
-    "playwright@claude-plugins-official": true,
-    "firebase@firebase": true
-  },
-  "extraKnownMarketplaces": {
-    "firebase": {
-      "source": {
-        "source": "github",
-        "repo": "firebase/firebase-tools"
-      }
-    }
+    "playwright@claude-plugins-official": true
   },
   "alwaysThinkingEnabled": true,
   "effortLevel": "high",
