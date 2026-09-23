@@ -131,11 +131,14 @@ Claude has a habit of prefixing every shell command with a `cd` into the working
 
 A second `PreToolUse` hook on the `Bash` tool, alongside `block-cd.ps1`. It exits with code 2 — rejecting the call and telling Claude to ask instead — for commands that reach into the machine or into Azure rather than into the repository:
 
+The command is first split into segments at `;`, `&&`, `||`, `|`, `&`, `(`, `{` and newlines — but never at one inside quotes, so `git commit -m "fix build; start retry loop"` is a single segment. Each segment is then judged by its head, the command it actually runs:
+
 | Rule | Blocks |
 |------|--------|
-| Executables | Any `.exe`, wherever it appears in the command, unless its bare file name is in the `$allowedExecutables` whitelist at the top of the script. That list ships **empty**. |
-| Launches and installs | `start`, `Start-Process`, `Start-Service`, `Stop-Service`, `explorer`, `net`/`sc start\|stop\|config`, `systemctl`, `open -a`, `schtasks`, `winget`/`choco`/`scoop install`, `npm i -g`, `docker desktop`. |
-| Azure CLI | `az` fails closed: allowed only when it matches a read shape (`list`, `show`, `exists`, `get-access-token`, `--version`, `--help`, …), and the verb must appear **before the first flag**, so `az ... update --query list` is not mistaken for a read. |
+| Launches and installs | A segment whose head is `start`, `explorer`, `Start-Process`, `Start-Service`, `Stop-Service`, `systemctl`, `schtasks`, `open -a`, `net`/`sc start\|stop\|config`, `winget`/`choco`/`scoop install\|uninstall\|upgrade`, `npm i -g` or `docker desktop`. The same word further along a segment is just an argument. |
+| Wrapper shells | `powershell`, `pwsh`, `cmd`, `bash` and `sh` are unwrapped: the string after `-Command`/`-c`, `/c`/`/k` or `-c` is checked again as a command of its own. Encoded PowerShell (`-EncodedCommand`, `-enc`, `-e`, `-ec`) is refused outright, because what it runs cannot be read. |
+| Executables | Any `.exe` anywhere in a segment, unless the segment is a read — its head is `grep`, `rg`, `git`, `cat`, `ls`, `find`, `echo`, `sed`, `Get-Content` or similar — or the bare file name is in the `$allowedExecutables` whitelist at the top of the script. That list ships **empty**. |
+| Azure CLI | A segment headed by `az` fails closed: allowed only when it matches a read shape (`list`, `show`, `exists`, `get-access-token`, `--version`, `--help`, …), and the verb must appear **before the first flag**, so `az ... update --query list` is not mistaken for a read. |
 
 The motivating incident: Claude wanted to run the contract tests, found the Docker daemon down, noted that the project README lists Docker as a prerequisite, and started Docker Desktop. The reasoning was sound and the conclusion was not — a documented prerequisite says what the task needs, not that you may change the state of someone's computer. The matching `CLAUDE.md` section is "My machine is mine"; this hook is what makes it stick.
 
@@ -143,13 +146,13 @@ The `.exe` rule is deliberately blunt, because nothing in ordinary work needs on
 
 No hook is airtight — a script written to disk and then invoked would slip past. This makes the easy path safe; the `CLAUDE.md` rule covers the rest.
 
-`tests\block-machine-reach.tests.ps1` runs the guard against 22 commands and exits non-zero on any surprise. Run it after editing the patterns:
+`tests\block-machine-reach.tests.ps1` runs the guard against 37 commands and exits non-zero on any surprise. Run it after editing the patterns:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\block-machine-reach.tests.ps1
 ```
 
-Half the cases are commands that must **not** be blocked, and they earn their place: the first version of this hook rejected `git commit -m "...blocks installs and az writes"`, because `az` appeared inside the message. A guard that fires on innocent commands is one people learn to route around, so the patterns that collide with ordinary English — `start`, `net`, `sc`, `az`, `open` — only match at the head of a command or straight after a `;`, `&&`, `|` or `(`.
+Half the cases are commands that must **not** be blocked, and they earn their place: the first version of this hook rejected `git commit -m "...blocks installs and az writes"`, because `az` appeared inside the message. A guard that fires on innocent commands is one people learn to route around. The second version still matched text: it rejected `grep -n Start-Process scripts/`, and a `;` inside a quoted commit message counted as a separator. That is why the guard now looks at the head of each quote-aware segment, and why reads and git commands are never judged by what they merely mention.
 
 ### claude-start.bat
 

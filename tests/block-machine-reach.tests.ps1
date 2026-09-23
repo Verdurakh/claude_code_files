@@ -55,7 +55,24 @@ $cases = @(
     @{ Expect = 2; Cmd = 'winget install Foo' },
     @{ Expect = 2; Cmd = 'npm install -g some-cli' },
     # The incident this guard exists for.
-    @{ Expect = 2; Cmd = '"/c/Program Files/Docker/Docker/Docker Desktop.exe" & sleep 2' }
+    @{ Expect = 2; Cmd = '"/c/Program Files/Docker/Docker/Docker Desktop.exe" & sleep 2' },
+    # Reads and git commands that name a launch verb or an executable, or quote a separator.
+    @{ Expect = 0; Cmd = 'grep -n Start-Process scripts/' },
+    @{ Expect = 0; Cmd = 'grep -rn "Docker Desktop.exe" docs/' },
+    @{ Expect = 0; Cmd = 'git commit -m "fix build; start retry loop"' },
+    @{ Expect = 0; Cmd = 'git log --grep "winget install"' },
+    @{ Expect = 0; Cmd = 'echo systemctl restart foo' },
+    @{ Expect = 0; Cmd = 'cat notes.txt | grep schtasks' },
+    @{ Expect = 0; Cmd = 'rg -n "npm install -g" README.md' },
+    # Launches hidden behind a separator or inside a wrapper shell.
+    @{ Expect = 2; Cmd = 'grep foo; schtasks /create /tn x /tr y' },
+    @{ Expect = 2; Cmd = 'powershell -c "& { Start-Process notepad }"' },
+    @{ Expect = 2; Cmd = 'powershell -EncodedCommand AAAA' },
+    @{ Expect = 2; Cmd = 'pwsh -Command Start-Service Docker' },
+    @{ Expect = 2; Cmd = 'cmd /c "start notepad"' },
+    @{ Expect = 2; Cmd = 'bash -c "systemctl start docker"' },
+    @{ Expect = 2; Cmd = 'echo hi && "C:\Tools\thing.exe"' },
+    @{ Expect = 2; Cmd = 'dotnet run; net start MyService' }
 )
 
 $failed = 0
