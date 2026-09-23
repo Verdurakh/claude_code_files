@@ -2,9 +2,9 @@
 # Companion to block-cd.ps1 on the same PreToolUse Bash matcher. Exit 2 blocks and returns the
 # message to Claude, which must then ask rather than route around it.
 
-# Executables Claude may invoke directly. Deliberately empty: as of 2026-09-23 nothing in the
-# Gunnebo.Platform.WorkOrder workflow needs one. The Stryker gate passes MSBuild.dll, not .exe, and
-# curl.exe appears only inside Scripts/*.ps1, which the hook never sees. Add a bare file name
+# Executables Claude may invoke directly. Deliberately empty: ordinary work rarely needs one. Build
+# tools are usually reachable without an .exe suffix (Stryker, for example, takes MSBuild.dll), and
+# curl.exe tends to appear only inside .ps1 scripts, which the hook never sees. Add a bare file name
 # (e.g. 'msbuild.exe') here when a block proves a real need.
 $allowedExecutables = @()
 

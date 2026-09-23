@@ -338,3 +338,7 @@ Deny rules always take precedence over allow rules regardless of order, so the s
 | `Read(~/.npmrc)` `Read(~/.pypirc)` `Read(~/.gem/credentials)` | Package registry credentials for npm, PyPI, and RubyGems. |
 | `Read(**/.env)` `Read(**/.env.*)` | Env files anywhere in the project tree. These typically contain secrets, API keys, and database URLs. `.env.example` and `.env.sample` are intentionally not blocked since they contain no real secrets. |
 | `Edit(**/.env)` `Edit(**/.env.*)` | Same as above — prevents Claude from modifying env files even if it can't read them. |
+
+## License
+
+MIT — see [LICENSE](LICENSE).
